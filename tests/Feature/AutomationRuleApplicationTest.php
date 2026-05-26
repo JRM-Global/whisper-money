@@ -10,7 +10,9 @@ use App\Models\Category;
 use App\Models\Label;
 use App\Models\Transaction;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Factories\Sequence;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 
@@ -86,6 +88,51 @@ test('matches endpoint skips already categorized when only_uncategorized is true
     $allResponse->assertOk()->assertJsonPath('total', 2);
 });
 
+test('matches endpoint avoids repeated relationship queries for description-only rules', function () {
+    Transaction::factory()->enableBanking()->create([
+        'id' => '00000000-0000-0000-0000-000000000001',
+        'user_id' => $this->user->id,
+        'account_id' => $this->account->id,
+        'category_id' => null,
+        'description' => 'Grocery Store',
+        'transaction_date' => '2024-01-01',
+        'amount' => -1000,
+    ]);
+
+    Transaction::factory()->enableBanking()->count(500)->sequence(
+        fn (Sequence $sequence): array => [
+            'id' => sprintf('ffffffff-ffff-ffff-ffff-%012d', $sequence->index),
+        ],
+    )->create([
+        'user_id' => $this->user->id,
+        'account_id' => $this->account->id,
+        'category_id' => null,
+        'description' => 'Grocery Store',
+        'transaction_date' => '2024-01-02',
+        'amount' => -1000,
+    ]);
+
+    $queries = [];
+    DB::listen(function ($query) use (&$queries): void {
+        $queries[] = $query->sql;
+    });
+
+    $this->actingAs($this->user)
+        ->getJson(route('automation-rules.matches', $this->rule))
+        ->assertOk()
+        ->assertJsonPath('total', 501);
+
+    $accountEagerLoadQueries = collect($queries)
+        ->filter(fn (string $query): bool => (str_contains($query, 'from "accounts"') || str_contains($query, 'from `accounts`'))
+            && (str_contains($query, '"accounts"."id" in') || str_contains($query, '`accounts`.`id` in')));
+    $bankEagerLoadQueries = collect($queries)
+        ->filter(fn (string $query): bool => (str_contains($query, 'from "banks"') || str_contains($query, 'from `banks`'))
+            && (str_contains($query, '"banks"."id" in') || str_contains($query, '`banks`.`id` in')));
+
+    expect($accountEagerLoadQueries)->toHaveCount(1)
+        ->and($bankEagerLoadQueries)->toHaveCount(1);
+});
+
 test('matches endpoint deduplicates cached matching transaction ids', function () {
     $transaction = Transaction::factory()->enableBanking()->create([
         'user_id' => $this->user->id,
@@ -140,6 +187,52 @@ test('apply endpoint runs synchronously when matches are below threshold', funct
             ->where('category_id', $this->category->id)
             ->count()
     )->toBe(3);
+});
+
+test('apply endpoint batches category and label writes', function () {
+    Queue::fake();
+
+    $label = Label::factory()->create(['user_id' => $this->user->id]);
+    $this->rule->labels()->attach($label);
+
+    Transaction::factory()->enableBanking()->count(5)->create([
+        'user_id' => $this->user->id,
+        'account_id' => $this->account->id,
+        'category_id' => null,
+        'description' => 'Grocery Store',
+        'amount' => -1000,
+    ]);
+
+    $queries = [];
+    DB::listen(function ($query) use (&$queries): void {
+        $queries[] = $query->sql;
+    });
+
+    $response = $this->actingAs($this->user)
+        ->postJson(route('automation-rules.apply', $this->rule), [
+            'only_uncategorized' => true,
+        ]);
+
+    $transactionUpdateQueries = collect($queries)
+        ->filter(fn (string $query): bool => str_contains($query, 'update "transactions" set')
+            || str_contains($query, 'update `transactions` set'));
+    $perTransactionPivotLookupQueries = collect($queries)
+        ->filter(fn (string $query): bool => (str_contains($query, 'from "label_transaction"')
+            || str_contains($query, 'from `label_transaction`'))
+            && (str_contains($query, '"label_transaction"."transaction_id" =')
+                || str_contains($query, '`label_transaction`.`transaction_id` =')));
+
+    $response->assertOk()
+        ->assertJsonPath('status', 'done')
+        ->assertJsonPath('applied', 5)
+        ->assertJsonPath('updated', 5)
+        ->assertJsonPath('total', 5);
+
+    expect($transactionUpdateQueries)->toHaveCount(1)
+        ->and($perTransactionPivotLookupQueries)->toHaveCount(0);
+
+    Queue::assertNothingPushed();
+    $this->assertDatabaseCount('label_transaction', 5);
 });
 
 test('apply endpoint queues a job when matches exceed threshold', function () {

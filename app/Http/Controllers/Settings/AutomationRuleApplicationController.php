@@ -96,8 +96,6 @@ class AutomationRuleApplicationController extends Controller
         }
 
         if ($total <= self::SYNC_THRESHOLD) {
-            $changed = 0;
-
             $transactions = Transaction::query()
                 ->where('user_id', $automationRule->user_id)
                 ->whereIn('id', $matchingIds)
@@ -105,11 +103,7 @@ class AutomationRuleApplicationController extends Controller
                 ->with(['account.bank', 'category', 'labels'])
                 ->get();
 
-            foreach ($transactions as $transaction) {
-                if ($service->applyRuleActions($transaction, $automationRule)) {
-                    $changed++;
-                }
-            }
+            $changed = $service->applyRuleActionsToTransactions($transactions, $automationRule);
 
             $applied = $transactions->count();
 
@@ -177,13 +171,18 @@ class AutomationRuleApplicationController extends Controller
 
         $ids = [];
 
+        $eagerLoads = $service->eagerLoadsForRuleEvaluation($rule);
+        if ($onlyUncategorized && $rule->action_category_id === null) {
+            $eagerLoads[] = 'labels';
+        }
+
         Transaction::query()
             ->where('user_id', $rule->user_id)
             ->whereNull('description_iv')
-            ->with(['account.bank', 'category', 'labels'])
+            ->with(array_values(array_unique($eagerLoads)))
             ->orderByDesc('transaction_date')
             ->orderByDesc('created_at')
-            ->chunkById(500, function ($transactions) use ($rule, $service, $onlyUncategorized, &$ids) {
+            ->chunk(500, function ($transactions) use ($rule, $service, $onlyUncategorized, &$ids) {
                 foreach ($transactions as $transaction) {
                     if ($onlyUncategorized && $service->shouldSkipForOnlyUncategorized($rule, $transaction)) {
                         continue;

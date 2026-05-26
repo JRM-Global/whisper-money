@@ -3,8 +3,11 @@
 namespace App\Services;
 
 use App\Models\AutomationRule;
+use App\Models\LabelTransaction;
 use App\Models\Transaction;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use JWadhams\JsonLogic;
 
 class AutomationRuleService
@@ -45,7 +48,7 @@ class AutomationRuleService
             return false;
         }
 
-        $transactionData = $this->prepareTransactionData($transaction);
+        $transactionData = $this->prepareTransactionData($transaction, $rule);
 
         try {
             $normalizedRulesJson = $this->normalizeRuleJson($rule->rules_json);
@@ -57,14 +60,82 @@ class AutomationRuleService
     }
 
     /**
-     * Apply a single rule's actions to the transaction, ignoring rule
-     * priority and other rules. The transaction must already match the rule.
-     *
-     * Returns true if any attribute of the transaction was changed.
+     * @param  EloquentCollection<int, Transaction>  $transactions
      */
-    public function applyRuleActions(Transaction $transaction, AutomationRule $rule): bool
+    public function applyRuleActionsToTransactions(EloquentCollection $transactions, AutomationRule $rule): int
     {
-        return $this->applyActions($transaction, $rule);
+        if ($transactions->isEmpty()) {
+            return 0;
+        }
+
+        $rule->loadMissing('labels');
+        $transactions->loadMissing('labels');
+
+        $changedTransactionIds = [];
+
+        if ($rule->action_category_id !== null) {
+            $categoryTransactionIds = $transactions
+                ->filter(fn (Transaction $transaction): bool => $transaction->category_id !== $rule->action_category_id)
+                ->pluck('id')
+                ->all();
+
+            if ($categoryTransactionIds !== []) {
+                Transaction::query()
+                    ->whereIn('id', $categoryTransactionIds)
+                    ->update([
+                        'category_id' => $rule->action_category_id,
+                        'updated_at' => now(),
+                    ]);
+
+                foreach ($categoryTransactionIds as $transactionId) {
+                    $changedTransactionIds[$transactionId] = true;
+                }
+            }
+        }
+
+        if ($rule->action_note && $rule->action_note_iv === null) {
+            foreach ($transactions as $transaction) {
+                $existingNotes = $transaction->notes ?? '';
+
+                if ($this->noteAlreadyPresent($existingNotes, $rule->action_note)) {
+                    continue;
+                }
+
+                $transaction->notes = $existingNotes
+                    ? $existingNotes."\n".$rule->action_note
+                    : $rule->action_note;
+                $transaction->saveQuietly();
+                $changedTransactionIds[$transaction->id] = true;
+            }
+        }
+
+        $labelIds = $rule->labels->pluck('id')->all();
+        if ($labelIds !== []) {
+            $now = now();
+            $labelTransactionRows = [];
+
+            foreach ($transactions as $transaction) {
+                $transactionLabelIds = $transaction->labels->pluck('id')->all();
+                $missingLabelIds = array_diff($labelIds, $transactionLabelIds);
+
+                foreach ($missingLabelIds as $labelId) {
+                    $labelTransactionRows[] = [
+                        'id' => (string) Str::uuid(),
+                        'label_id' => $labelId,
+                        'transaction_id' => $transaction->id,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                    $changedTransactionIds[$transaction->id] = true;
+                }
+            }
+
+            if ($labelTransactionRows !== []) {
+                LabelTransaction::query()->insertOrIgnore($labelTransactionRows);
+            }
+        }
+
+        return count($changedTransactionIds);
     }
 
     /**
@@ -92,14 +163,36 @@ class AutomationRuleService
     }
 
     /**
+     * @return array<int, string>
+     */
+    public function eagerLoadsForRuleEvaluation(AutomationRule $rule): array
+    {
+        $variables = $this->ruleVariables($rule);
+        $eagerLoads = [];
+
+        if (in_array('bank_name', $variables, true)) {
+            $eagerLoads[] = 'account.bank';
+        } elseif (in_array('account_name', $variables, true)) {
+            $eagerLoads[] = 'account';
+        }
+
+        if (in_array('category', $variables, true)) {
+            $eagerLoads[] = 'category';
+        }
+
+        return $eagerLoads;
+    }
+
+    /**
      * @return array{description: string, amount: float, transaction_date: string, bank_name: string, account_name: string, category: string|null, notes: string|null}
      */
-    private function prepareTransactionData(Transaction $transaction): array
+    private function prepareTransactionData(Transaction $transaction, ?AutomationRule $rule = null): array
     {
-        $transaction->loadMissing(['account.bank', 'category']);
+        $transaction->loadMissing($rule ? $this->eagerLoadsForRuleEvaluation($rule) : ['account.bank', 'category']);
 
-        $account = $transaction->account;
-        $bank = $account?->bank;
+        $account = $transaction->relationLoaded('account') ? $transaction->account : null;
+        $bank = $account?->relationLoaded('bank') ? $account->bank : null;
+        $category = $transaction->relationLoaded('category') ? $transaction->category : null;
 
         $accountName = '';
         if ($account && ! $account->encrypted) {
@@ -112,7 +205,7 @@ class AutomationRuleService
             'transaction_date' => $transaction->transaction_date->format('Y-m-d'),
             'bank_name' => mb_strtolower($bank->name ?? ''),
             'account_name' => mb_strtolower($accountName),
-            'category' => $transaction->category?->name,
+            'category' => $category?->name,
             'notes' => $transaction->notes
                 ? $this->normalizeWhitespace(mb_strtolower($transaction->notes))
                 : null,
@@ -139,6 +232,35 @@ class AutomationRuleService
         }
 
         return null;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function ruleVariables(AutomationRule $rule): array
+    {
+        $variables = [];
+        $this->collectRuleVariables($this->normalizeRuleJson($rule->rules_json), $variables);
+
+        return array_values(array_unique($variables));
+    }
+
+    /**
+     * @param  array<int, string>  $variables
+     */
+    private function collectRuleVariables(mixed $ruleJson, array &$variables): void
+    {
+        if (! is_array($ruleJson)) {
+            return;
+        }
+
+        if (isset($ruleJson['var']) && is_string($ruleJson['var'])) {
+            $variables[] = $ruleJson['var'];
+        }
+
+        foreach ($ruleJson as $value) {
+            $this->collectRuleVariables($value, $variables);
+        }
     }
 
     private function applyActions(Transaction $transaction, AutomationRule $rule): bool
