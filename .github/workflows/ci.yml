@@ -368,6 +368,7 @@ jobs:
         run: curl -sL https://sentry.io/get-cli/ | bash
 
       - name: Create Sentry release
+        continue-on-error: true
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
@@ -587,6 +588,7 @@ jobs:
 
       - name: Trigger deployment
         if: steps.deploy_guard.outputs.should_deploy == 'true'
+        continue-on-error: true
         run: |
           max_attempts=5
           attempt=1
@@ -631,6 +633,7 @@ jobs:
 
       - name: Create Sentry release
         if: steps.deploy_guard.outputs.should_deploy == 'true'
+        continue-on-error: true
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
@@ -645,6 +648,7 @@ jobs:
 
       - name: Mark Sentry release deployed
         if: steps.deploy_guard.outputs.should_deploy == 'true'
+        continue-on-error: true
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
