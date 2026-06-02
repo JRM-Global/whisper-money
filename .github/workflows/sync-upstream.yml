@@ -26,7 +26,9 @@ jobs:
         run: |
           git remote add upstream https://github.com/whisper-money/whisper-money.git
           git fetch upstream
-          git checkout main
+          # Checkout origin/main explícitamente: con dos remotes (origin + upstream)
+          # ambos con rama "main", "git checkout main" es ambiguo.
+          git checkout -B main origin/main
           if git merge upstream/main --no-edit -m "chore: sync upstream $(date +%Y-%m-%d)"; then
             git push origin main
           else
