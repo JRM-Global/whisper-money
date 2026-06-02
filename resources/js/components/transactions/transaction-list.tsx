@@ -1,5 +1,6 @@
 import { useLocale } from '@/hooks/use-locale';
 import { __ } from '@/utils/i18n';
+import { Link } from '@inertiajs/react';
 import {
     Cell,
     ColumnFiltersState,
@@ -15,6 +16,7 @@ import {
 import { VirtualItem, Virtualizer } from '@tanstack/react-virtual';
 import axios from 'axios';
 import { format, getYear, isWithinInterval, parseISO } from 'date-fns';
+import { ExternalLink } from 'lucide-react';
 import {
     createElement,
     useCallback,
@@ -26,6 +28,7 @@ import {
 import { toast } from 'sonner';
 
 import { single as reEvaluateSingle } from '@/actions/App/Http/Controllers/ReEvaluateTransactionRulesController';
+import { index as transactionsIndex } from '@/actions/App/Http/Controllers/TransactionController';
 import {
     AutomateCategorizationDialog,
     type AutomateCategorizationCandidate,
@@ -181,6 +184,8 @@ function getInitialColumnVisibility(): VisibilityState {
     const defaultVisibility = {
         transaction_date: true,
         account: true,
+        creditor_name: false,
+        debtor_name: false,
         labels: true,
         notes: false,
     };
@@ -293,6 +298,8 @@ export function TransactionList({
         categoryIds: [],
         accountIds: accountId ? [accountId] : [],
         labelIds: [],
+        creditorName: '',
+        debtorName: '',
         searchText: '',
     });
     const [editTransaction, setEditTransaction] =
@@ -400,6 +407,12 @@ export function TransactionList({
                                     ...transaction,
                                     decryptedDescription,
                                     decryptedNotes,
+                                    label_ids:
+                                        transaction.label_ids ??
+                                        transaction.labels?.map(
+                                            (label) => label.id,
+                                        ) ??
+                                        [],
                                 } as DecryptedTransaction;
                             } catch (error) {
                                 console.error(
@@ -811,6 +824,24 @@ export function TransactionList({
                 return false;
             }
 
+            if (
+                filters.creditorName &&
+                !transaction.creditor_name
+                    ?.toLowerCase()
+                    .includes(filters.creditorName.toLowerCase())
+            ) {
+                return false;
+            }
+
+            if (
+                filters.debtorName &&
+                !transaction.debtor_name
+                    ?.toLowerCase()
+                    .includes(filters.debtorName.toLowerCase())
+            ) {
+                return false;
+            }
+
             return true;
         });
     }, [transactions, filters, isKeySet, accountId, searchMatchedIds]);
@@ -844,6 +875,14 @@ export function TransactionList({
                     const categoryA = a.category?.name || '';
                     const categoryB = b.category?.name || '';
                     comparison = categoryA.localeCompare(categoryB);
+                } else if (id === 'creditor_name') {
+                    comparison = (a.creditor_name || '').localeCompare(
+                        b.creditor_name || '',
+                    );
+                } else if (id === 'debtor_name') {
+                    comparison = (a.debtor_name || '').localeCompare(
+                        b.debtor_name || '',
+                    );
                 }
 
                 if (comparison !== 0) {
@@ -1355,6 +1394,22 @@ export function TransactionList({
                                     ) : (
                                         <>{__('Load more')}</>
                                     )}
+                                </Button>
+                            )}
+                            {accountId && (
+                                <Button asChild variant="outline">
+                                    <Link
+                                        href={
+                                            transactionsIndex({
+                                                query: {
+                                                    account_ids: accountId,
+                                                },
+                                            }).url
+                                        }
+                                    >
+                                        <ExternalLink />
+                                        {__('View in Transactions')}
+                                    </Link>
                                 </Button>
                             )}
                         </DataTablePagination>

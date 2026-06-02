@@ -25,6 +25,7 @@ import {
     isChunkLoadErrorEvent,
     isFacebookInAppBrowserJavaBridgeNoise,
     isPostMessageDataCloneNoise,
+    isSafariCashbackExtensionNoise,
 } from './lib/sentry';
 import { showSubscriptionPaymentIssueToast } from './lib/subscription-payment-issue-toast';
 import type { ExpiredBankingConnectionNotification, SharedData } from './types';
@@ -42,7 +43,8 @@ Sentry.init({
         if (
             isChunkLoadErrorEvent(event) ||
             isPostMessageDataCloneNoise(event) ||
-            isFacebookInAppBrowserJavaBridgeNoise(event)
+            isFacebookInAppBrowserJavaBridgeNoise(event) ||
+            isSafariCashbackExtensionNoise(event)
         ) {
             return null;
         }
@@ -50,7 +52,8 @@ Sentry.init({
         return event;
     },
     enabled:
-        import.meta.env.PROD && Boolean(import.meta.env.SENTRY_LARAVEL_DSN),
+        import.meta.env.MODE === 'production' &&
+        Boolean(import.meta.env.SENTRY_LARAVEL_DSN),
 });
 
 initializePostHog();

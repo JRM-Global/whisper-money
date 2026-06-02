@@ -42,6 +42,8 @@ class TransactionController extends Controller
             'category_ids' => $validated['category_ids'] ?? null,
             'account_ids' => $validated['account_ids'] ?? null,
             'label_ids' => $validated['label_ids'] ?? null,
+            'creditor_name' => $validated['creditor_name'] ?? null,
+            'debtor_name' => $validated['debtor_name'] ?? null,
             'search' => $validated['search'] ?? null,
         ], fn ($value) => $value !== null);
 
@@ -62,6 +64,8 @@ class TransactionController extends Controller
             'category_ids' => $validated['category_ids'] ?? [],
             'account_ids' => $validated['account_ids'] ?? [],
             'label_ids' => $validated['label_ids'] ?? [],
+            'creditor_name' => $validated['creditor_name'] ?? '',
+            'debtor_name' => $validated['debtor_name'] ?? '',
             'search' => $validated['search'] ?? '',
             'sort' => $sortParam,
         ];
@@ -141,7 +145,7 @@ class TransactionController extends Controller
             ->with(['account.bank:id,name,logo', 'labels:id,name,color'])
             ->orderBy('transaction_date', 'desc')
             ->orderBy('id', 'desc')
-            ->get(['id', 'account_id', 'category_id', 'description', 'description_iv', 'transaction_date', 'amount', 'currency_code', 'notes', 'notes_iv']);
+            ->get(['id', 'account_id', 'category_id', 'description', 'description_iv', 'transaction_date', 'amount', 'currency_code', 'notes', 'notes_iv', 'creditor_name', 'debtor_name']);
 
         return Inertia::render('transactions/categorize', [
             'categories' => $categories,

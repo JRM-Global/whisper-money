@@ -18,8 +18,10 @@ use App\Services\Banking\BalanceSyncService;
 use App\Services\Banking\TransactionSyncService;
 use Carbon\Carbon;
 use GuzzleHttp\Psr7\Response;
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Contracts\Queue\Job;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Queue\MaxAttemptsExceededException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
@@ -481,6 +483,38 @@ test('daily bank sync email job sends pending transactions once per day', functi
     $job->handle();
 
     Mail::assertQueued(BankTransactionsSyncedEmail::class, 1);
+});
+
+test('daily bank sync email job does not send when user disabled the notification', function () {
+    Mail::fake();
+
+    test()->travelTo(Carbon::parse('2026-04-15 09:00:00'));
+
+    $user = User::factory()->onboarded()->create();
+    $user->setting()->create(['notify_on_bank_transactions_synced' => false]);
+    $bank = Bank::factory()->create(['name' => 'Opted Out Bank']);
+    $connection = BankingConnection::factory()->create([
+        'user_id' => $user->id,
+        'last_synced_at' => now()->subDay(),
+    ]);
+    $account = Account::factory()->connected()->create([
+        'user_id' => $user->id,
+        'banking_connection_id' => $connection->id,
+        'bank_id' => $bank->id,
+    ]);
+
+    Transaction::factory()->count(2)->enableBanking()->create([
+        'user_id' => $user->id,
+        'account_id' => $account->id,
+        'created_at' => now()->subMinutes(10),
+        'updated_at' => now()->subMinutes(10),
+    ]);
+
+    $job = new SendDailyBankTransactionsSyncedEmailJob($user, now()->toDateString());
+    $job->handle();
+
+    Mail::assertNothingQueued();
+    expect(UserMailLog::query()->count())->toBe(0);
 });
 
 test('daily bank sync email job releases during quiet hours in user timezone', function () {
@@ -1453,4 +1487,22 @@ test('successful sync clears rate_limited_until', function () {
 
     $connection->refresh();
     expect($connection->rate_limited_until)->toBeNull();
+});
+
+test('does not report MaxAttemptsExceededException raised for SyncBankingConnectionJob', function () {
+    $queueJob = Mockery::mock(Job::class);
+    $queueJob->shouldReceive('resolveName')->andReturn(SyncBankingConnectionJob::class);
+
+    $exception = MaxAttemptsExceededException::forJob($queueJob);
+
+    expect(app(ExceptionHandler::class)->shouldReport($exception))->toBeFalse();
+});
+
+test('still reports MaxAttemptsExceededException raised for other jobs', function () {
+    $queueJob = Mockery::mock(Job::class);
+    $queueJob->shouldReceive('resolveName')->andReturn(SendDailyBankTransactionsSyncedEmailJob::class);
+
+    $exception = MaxAttemptsExceededException::forJob($queueJob);
+
+    expect(app(ExceptionHandler::class)->shouldReport($exception))->toBeTrue();
 });

@@ -129,24 +129,27 @@ test('different users can create categories with the same name', function () {
     ]);
 });
 
-test('category names from deleted categories remain reserved', function () {
+test('users can recreate a category with the same name after deleting it', function () {
     $user = User::factory()->create();
     $category = Category::factory()->create([
         'user_id' => $user->id,
-        'name' => 'Healthcare',
+        'name' => 'Supermercados',
     ]);
 
     $category->delete();
 
     $response = $this->actingAs($user)->post(route('categories.store'), [
-        'name' => 'Healthcare',
-        'icon' => 'Heart',
-        'color' => 'pink',
+        'name' => 'Supermercados',
+        'icon' => 'ShoppingCart',
+        'color' => 'green',
         'type' => 'expense',
         'cashflow_direction' => 'hidden',
     ]);
 
-    $response->assertSessionHasErrors(['name']);
+    $response->assertRedirect(route('categories.index'));
+
+    expect($user->categories()->where('name', 'Supermercados')->count())->toBe(1)
+        ->and($user->categories()->withTrashed()->where('name', 'Supermercados')->count())->toBe(2);
 });
 
 test('category icon is required', function () {
@@ -357,7 +360,7 @@ test('users can create savings and investment categories', function (string $typ
         'user_id' => $user->id,
         'name' => ucfirst($type),
         'type' => $type,
-        'cashflow_direction' => CategoryCashflowDirection::Hidden->value,
+        'cashflow_direction' => CategoryCashflowDirection::Outflow->value,
     ]);
 })->with([
     CategoryType::Savings->value,
@@ -426,6 +429,44 @@ test('migration updates existing default saving and investment categories', func
     expect($customTransfer->refresh())
         ->type->toBe(CategoryType::Transfer)
         ->cashflow_direction->toBe(CategoryCashflowDirection::Outflow);
+});
+
+test('migration sets saving and investment categories to cashflow outflow', function () {
+    $user = User::factory()->create();
+
+    $savings = Category::factory()->create([
+        'user_id' => $user->id,
+        'type' => CategoryType::Savings,
+        'cashflow_direction' => CategoryCashflowDirection::Hidden,
+    ]);
+    $investment = Category::factory()->create([
+        'user_id' => $user->id,
+        'type' => CategoryType::Investment,
+        'cashflow_direction' => CategoryCashflowDirection::Hidden,
+    ]);
+    $transfer = Category::factory()->create([
+        'user_id' => $user->id,
+        'type' => CategoryType::Transfer,
+        'cashflow_direction' => CategoryCashflowDirection::Inflow,
+    ]);
+    $expense = Category::factory()->create([
+        'user_id' => $user->id,
+        'type' => CategoryType::Expense,
+        'cashflow_direction' => CategoryCashflowDirection::Hidden,
+    ]);
+
+    $migration = require database_path('migrations/2026_05_29_085835_update_saving_and_investment_category_cashflow_direction.php');
+    $migration->up();
+
+    expect($savings->refresh()->cashflow_direction)->toBe(CategoryCashflowDirection::Outflow);
+    expect($investment->refresh()->cashflow_direction)->toBe(CategoryCashflowDirection::Outflow);
+    expect($transfer->refresh()->cashflow_direction)->toBe(CategoryCashflowDirection::Inflow);
+    expect($expense->refresh()->cashflow_direction)->toBe(CategoryCashflowDirection::Hidden);
+
+    $migration->down();
+
+    expect($savings->refresh()->cashflow_direction)->toBe(CategoryCashflowDirection::Hidden);
+    expect($investment->refresh()->cashflow_direction)->toBe(CategoryCashflowDirection::Hidden);
 });
 
 test('users cannot update categories they do not own', function () {
@@ -497,13 +538,13 @@ test('default categories are created when user registers', function () {
 
     expect($user->categories()->firstWhere('name', 'Investments'))
         ->type->toBe(CategoryType::Investment)
-        ->cashflow_direction->toBe(CategoryCashflowDirection::Hidden);
+        ->cashflow_direction->toBe(CategoryCashflowDirection::Outflow);
     expect($user->categories()->firstWhere('name', 'Savings'))
         ->type->toBe(CategoryType::Savings)
-        ->cashflow_direction->toBe(CategoryCashflowDirection::Hidden);
+        ->cashflow_direction->toBe(CategoryCashflowDirection::Outflow);
     expect($user->categories()->firstWhere('name', 'Other investments'))
         ->type->toBe(CategoryType::Investment)
-        ->cashflow_direction->toBe(CategoryCashflowDirection::Hidden);
+        ->cashflow_direction->toBe(CategoryCashflowDirection::Outflow);
     expect($user->categories()->firstWhere('name', 'From account of relatives'))
         ->type->toBe(CategoryType::Transfer)
         ->cashflow_direction->toBe(CategoryCashflowDirection::Inflow);

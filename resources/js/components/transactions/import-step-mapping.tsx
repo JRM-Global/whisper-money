@@ -83,11 +83,7 @@ export function ImportStepMapping({
         if (!effectiveCalculate) {
             return null;
         }
-        return getLatestTransactionDate(
-            parsedData,
-            columnMapping,
-            dateFormat,
-        );
+        return getLatestTransactionDate(parsedData, columnMapping, dateFormat);
     }, [effectiveCalculate, parsedData, columnMapping, dateFormat]);
 
     useEffect(() => {
@@ -422,10 +418,7 @@ export function ImportStepMapping({
                                 <div className="space-y-2 rounded-md border bg-muted/30 p-3">
                                     <Label htmlFor="reference-balance">
                                         {__('Balance on')}{' '}
-                                        {formatRelativeDate(
-                                            latestDate,
-                                            locale,
-                                        )}{' '}
+                                        {formatRelativeDate(latestDate, locale)}{' '}
                                         <span className="text-destructive">
                                             *
                                         </span>
@@ -448,6 +441,80 @@ export function ImportStepMapping({
                             )}
                         </div>
                     )}
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                        <Label htmlFor="creditor-column">
+                            {__('Creditor name (Optional)')}
+                        </Label>
+                        <Select
+                            value={columnMapping.creditor_name || '__none__'}
+                            onValueChange={(value) =>
+                                onMappingChange(
+                                    'creditor_name',
+                                    value === '__none__' ? '' : value,
+                                )
+                            }
+                        >
+                            <SelectTrigger id="creditor-column">
+                                <SelectValue
+                                    placeholder={__(
+                                        'Select creditor column (optional)',
+                                    )}
+                                />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="__none__">
+                                    {__('None')}
+                                </SelectItem>
+                                {columnOptions.map((option, index) => (
+                                    <SelectItem
+                                        key={`creditor-${option.value}-${index}`}
+                                        value={option.value}
+                                    >
+                                        {option.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="debtor-column">
+                            {__('Debtor name (Optional)')}
+                        </Label>
+                        <Select
+                            value={columnMapping.debtor_name || '__none__'}
+                            onValueChange={(value) =>
+                                onMappingChange(
+                                    'debtor_name',
+                                    value === '__none__' ? '' : value,
+                                )
+                            }
+                        >
+                            <SelectTrigger id="debtor-column">
+                                <SelectValue
+                                    placeholder={__(
+                                        'Select debtor column (optional)',
+                                    )}
+                                />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="__none__">
+                                    {__('None')}
+                                </SelectItem>
+                                {columnOptions.map((option, index) => (
+                                    <SelectItem
+                                        key={`debtor-${option.value}-${index}`}
+                                        value={option.value}
+                                    >
+                                        {option.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
 
                 {baseMappingValid && previewTransactions.length > 0 && (
@@ -524,6 +591,19 @@ export function ImportStepMapping({
                                     className="cursor-pointer font-normal"
                                 >
                                     {__('DD-MM-YYYY (e.g., 31-12-2024)')}
+                                </Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem
+                                    value={DateFormat.YearMonthDayCompact}
+                                    id="format-ymd-compact"
+                                />
+
+                                <Label
+                                    htmlFor="format-ymd-compact"
+                                    className="cursor-pointer font-normal"
+                                >
+                                    {__('YYYYMMDD (e.g., 20241231)')}
                                 </Label>
                             </div>
                         </RadioGroup>

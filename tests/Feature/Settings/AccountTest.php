@@ -132,6 +132,101 @@ it('accepts new latam currency when creating account', function () {
     ]);
 });
 
+it('accepts Colombian peso when creating account', function () {
+    actingAs($this->user);
+
+    $response = $this->post(route('accounts.store'), [
+        'name' => 'Colombia Account',
+        'bank_id' => $this->bank->id,
+        'currency_code' => 'COP',
+        'type' => AccountType::Checking->value,
+    ]);
+
+    $response->assertRedirect();
+
+    assertDatabaseHas('accounts', [
+        'user_id' => $this->user->id,
+        'bank_id' => $this->bank->id,
+        'currency_code' => 'COP',
+    ]);
+});
+
+it('accepts Dominican peso when creating account', function () {
+    actingAs($this->user);
+
+    $response = $this->post(route('accounts.store'), [
+        'name' => 'Dominican Account',
+        'bank_id' => $this->bank->id,
+        'currency_code' => 'DOP',
+        'type' => AccountType::Checking->value,
+    ]);
+
+    $response->assertRedirect();
+
+    assertDatabaseHas('accounts', [
+        'user_id' => $this->user->id,
+        'bank_id' => $this->bank->id,
+        'currency_code' => 'DOP',
+    ]);
+});
+
+it('accepts Pakistani rupee when creating account', function () {
+    actingAs($this->user);
+
+    $response = $this->post(route('accounts.store'), [
+        'name' => 'Pakistan Account',
+        'bank_id' => $this->bank->id,
+        'currency_code' => 'PKR',
+        'type' => AccountType::Checking->value,
+    ]);
+
+    $response->assertRedirect();
+
+    assertDatabaseHas('accounts', [
+        'user_id' => $this->user->id,
+        'bank_id' => $this->bank->id,
+        'currency_code' => 'PKR',
+    ]);
+});
+
+it('accepts Brazilian real when creating account', function () {
+    actingAs($this->user);
+
+    $response = $this->post(route('accounts.store'), [
+        'name' => 'Brazil Account',
+        'bank_id' => $this->bank->id,
+        'currency_code' => 'BRL',
+        'type' => AccountType::Checking->value,
+    ]);
+
+    $response->assertRedirect();
+
+    assertDatabaseHas('accounts', [
+        'user_id' => $this->user->id,
+        'bank_id' => $this->bank->id,
+        'currency_code' => 'BRL',
+    ]);
+});
+
+it('accepts Saudi riyal when creating account', function () {
+    actingAs($this->user);
+
+    $response = $this->post(route('accounts.store'), [
+        'name' => 'Saudi Account',
+        'bank_id' => $this->bank->id,
+        'currency_code' => 'SAR',
+        'type' => AccountType::Checking->value,
+    ]);
+
+    $response->assertRedirect();
+
+    assertDatabaseHas('accounts', [
+        'user_id' => $this->user->id,
+        'bank_id' => $this->bank->id,
+        'currency_code' => 'SAR',
+    ]);
+});
+
 it('accepts bitcoin when creating account', function () {
     actingAs($this->user);
 

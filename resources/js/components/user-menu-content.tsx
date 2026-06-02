@@ -1,3 +1,4 @@
+import DiscordIcon from '@/components/icons/DiscordIcon';
 import {
     DropdownMenuGroup,
     DropdownMenuItem,
@@ -92,6 +93,18 @@ export function UserMenuContent({ user }: UserMenuContentProps) {
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
+                <DropdownMenuItem asChild>
+                    <a
+                        className="block w-full cursor-pointer"
+                        href="https://discord.gg/m8hUhx6D9D"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={cleanup}
+                    >
+                        <DiscordIcon className="mr-2 size-4" />
+                        {__('Community')}
+                    </a>
+                </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                     <a
                         className="block w-full cursor-pointer"
