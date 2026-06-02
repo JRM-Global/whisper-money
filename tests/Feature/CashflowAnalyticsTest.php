@@ -73,7 +73,10 @@ test('cashflow summary returns income, expense, net, and savings rate', function
 });
 
 test('cashflow analytics convert foreign currency transactions to user currency', function () {
-    $date = now()->startOfMonth()->addDays(4);
+    // El día 5 del mes cae en el futuro los días 1-4, y ExchangeRateService::normalizeDate
+    // clampa fechas futuras a hoy, dejando la tasa sin encontrar. Evitamos fechas futuras.
+    $candidate = now()->startOfMonth()->addDays(4);
+    $date = $candidate->isFuture() ? now()->startOfDay() : $candidate;
     $from = $date->copy()->startOfMonth()->toDateString();
     $to = $date->copy()->endOfMonth()->toDateString();
 
