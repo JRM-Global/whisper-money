@@ -57,6 +57,12 @@ return [
             'allows_account' => true,
         ],
         [
+            'code' => 'PKR',
+            'name' => 'Pakistani Rupee',
+            'allows_primary' => true,
+            'allows_account' => true,
+        ],
+        [
             'code' => 'MXN',
             'name' => 'Mexican Peso',
             'allows_primary' => true,
@@ -81,12 +87,6 @@ return [
             'allows_account' => true,
         ],
         [
-            'code' => 'COP',
-            'name' => 'Colombian Peso',
-            'allows_primary' => true,
-            'allows_account' => true,
-        ],
-        [
             'code' => 'PYG',
             'name' => 'Paraguayan Guarani',
             'allows_primary' => true,
@@ -107,6 +107,30 @@ return [
         [
             'code' => 'VES',
             'name' => 'Venezuelan Bolívar',
+            'allows_primary' => true,
+            'allows_account' => true,
+        ],
+        [
+            'code' => 'BRL',
+            'name' => 'Brazilian Real',
+            'allows_primary' => true,
+            'allows_account' => true,
+        ],
+        [
+            'code' => 'COP',
+            'name' => 'Colombian Peso',
+            'allows_primary' => true,
+            'allows_account' => true,
+        ],
+        [
+            'code' => 'DOP',
+            'name' => 'Dominican Peso',
+            'allows_primary' => true,
+            'allows_account' => true,
+        ],
+        [
+            'code' => 'SAR',
+            'name' => 'Saudi Riyal',
             'allows_primary' => true,
             'allows_account' => true,
         ],

@@ -15,6 +15,7 @@ import { importKey } from '@/lib/crypto';
 import {
     autoDetectColumns,
     calculateBalancesFromTransactions,
+    collectBalancesToImport,
     convertRowsToTransactions,
     parseFile,
 } from '@/lib/file-parser';
@@ -99,6 +100,8 @@ export function ImportTransactionsDrawer({
             description: null,
             amount: null,
             balance: null,
+            creditor_name: null,
+            debtor_name: null,
         },
         dateFormat: DateFormat.YearMonthDay,
         dateFormatDetected: false,
@@ -134,6 +137,8 @@ export function ImportTransactionsDrawer({
                     description: null,
                     amount: null,
                     balance: null,
+                    creditor_name: null,
+                    debtor_name: null,
                 },
                 dateFormat: DateFormat.YearMonthDay,
                 dateFormatDetected: false,
@@ -306,22 +311,19 @@ export function ImportTransactionsDrawer({
         }));
     };
 
-    const handleLatestDateChange = useCallback(
-        (date: string | null) => {
-            setState((prev) => {
-                if (prev.referenceBalanceDate === date) {
-                    return prev;
-                }
-                return {
-                    ...prev,
-                    referenceBalanceDate: date,
-                    referenceBalance: null,
-                    referenceBalancePrefilled: false,
-                };
-            });
-        },
-        [],
-    );
+    const handleLatestDateChange = useCallback((date: string | null) => {
+        setState((prev) => {
+            if (prev.referenceBalanceDate === date) {
+                return prev;
+            }
+            return {
+                ...prev,
+                referenceBalanceDate: date,
+                referenceBalance: null,
+                referenceBalancePrefilled: false,
+            };
+        });
+    }, []);
 
     // Try to pre-fill the reference balance from an existing balance record
     // on that date. If found, no need to ask the user.
@@ -446,7 +448,9 @@ export function ImportTransactionsDrawer({
                         balance:
                             calculatedBalances.get(
                                 transaction.transaction_date,
-                            ) ?? transaction.balance ?? null,
+                            ) ??
+                            transaction.balance ??
+                            null,
                     }));
             }
 
@@ -519,6 +523,8 @@ export function ImportTransactionsDrawer({
                                 amount: transaction.amount / 100,
                                 transaction_date: transaction.transaction_date,
                                 account_id: selectedAccount.id,
+                                creditor_name: transaction.creditor_name,
+                                debtor_name: transaction.debtor_name,
                             },
                             rules,
                             categories,
@@ -552,17 +558,20 @@ export function ImportTransactionsDrawer({
 
                     const transactionData = {
                         user_id:
-                            (selectedAccount as Account & { user_id?: number })
-                                .user_id || 0,
+                            (selectedAccount as Account & { user_id?: string })
+                                .user_id ||
+                            '00000000-0000-0000-0000-000000000000',
                         account_id: selectedAccount.id,
                         category_id: categoryId,
                         description: encrypted,
                         description_iv: iv,
                         transaction_date: transaction.transaction_date,
-                        amount: transaction.amount.toString(),
+                        amount: transaction.amount,
                         currency_code: selectedAccount.currency_code,
                         notes: notes,
                         notes_iv: notesIv,
+                        creditor_name: transaction.creditor_name ?? null,
+                        debtor_name: transaction.debtor_name ?? null,
                         source: 'imported' as const,
                         label_ids: labelIds.length > 0 ? labelIds : undefined,
                     };
@@ -620,18 +629,7 @@ export function ImportTransactionsDrawer({
             setImportProgress(processedCount);
         }
 
-        const balancesToImport = new Map<string, number>();
-        for (const transaction of newTransactions) {
-            if (
-                transaction.balance !== null &&
-                transaction.balance !== undefined
-            ) {
-                balancesToImport.set(
-                    transaction.transaction_date,
-                    transaction.balance,
-                );
-            }
-        }
+        const balancesToImport = collectBalancesToImport(newTransactions);
 
         if (balancesToImport.size > 0) {
             try {

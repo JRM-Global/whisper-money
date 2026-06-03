@@ -624,11 +624,9 @@ test('when budget with label exists, updating transaction with that label assign
     $label = Label::factory()->create(['user_id' => $user->id, 'name' => 'Work']);
 
     // Create a budget filtered by this label
-    $budget = Budget::factory()->create([
+    $budget = Budget::factory()->forLabels($label)->create([
         'user_id' => $user->id,
         'name' => 'Work Expenses',
-        'label_id' => $label->id,
-        'category_id' => null,
     ]);
 
     // Create the current budget period
@@ -717,6 +715,29 @@ test('categorize page only returns uncategorized transactions', function () {
         ->component('transactions/categorize')
         ->has('transactions', 1)
         ->where('transactions.0.id', $uncategorized->id)
+    );
+});
+
+test('categorize page exposes debtor and creditor names', function () {
+    $user = User::factory()->onboarded()->create();
+    $account = Account::factory()->create(['user_id' => $user->id]);
+
+    $transaction = Transaction::factory()->create([
+        'user_id' => $user->id,
+        'account_id' => $account->id,
+        'category_id' => null,
+        'creditor_name' => 'Acme Corp',
+        'debtor_name' => 'Jane Doe',
+    ]);
+
+    $response = actingAs($user)->get(route('transactions.categorize'));
+
+    $response->assertSuccessful();
+    $response->assertInertia(fn ($page) => $page
+        ->component('transactions/categorize')
+        ->where('transactions.0.id', $transaction->id)
+        ->where('transactions.0.creditor_name', 'Acme Corp')
+        ->where('transactions.0.debtor_name', 'Jane Doe')
     );
 });
 

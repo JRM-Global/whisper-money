@@ -64,6 +64,7 @@ interface EditTransactionDialogProps {
     ) => void;
     onLabelCreated?: (label: Label) => void;
     mode: 'create' | 'edit';
+    initialAccountId?: string | null;
 }
 
 export function EditTransactionDialog({
@@ -79,6 +80,7 @@ export function EditTransactionDialog({
     onCategorized,
     onLabelCreated,
     mode,
+    initialAccountId = null,
 }: EditTransactionDialogProps) {
     const locale = useLocale();
     const STORAGE_KEY_UPDATE_BALANCE =
@@ -123,14 +125,20 @@ export function EditTransactionDialog({
             setDescription('');
             setAmount(0);
             const availableAccounts = filterTransactionalAccounts(accounts);
+            const initialAccount = availableAccounts.find(
+                (account) => account.id === initialAccountId,
+            );
             setAccountId(
-                availableAccounts.length > 0 ? availableAccounts[0].id : '',
+                initialAccount?.id ??
+                    (availableAccounts.length > 0
+                        ? availableAccounts[0].id
+                        : ''),
             );
             setCategoryId('null');
             setSelectedLabelIds([]);
             setNotes('');
         }
-    }, [mode, transaction, open, accounts]);
+    }, [mode, transaction, open, accounts, initialAccountId]);
 
     useEffect(() => {
         if (!open || mode !== 'create') return;
@@ -412,6 +420,8 @@ export function EditTransactionDialog({
                     currency_code: selectedAccount.currency_code,
                     notes: encryptedNotes,
                     notes_iv: notesIv,
+                    creditor_name: null,
+                    debtor_name: null,
                     source: 'manually_created' as const,
                     label_ids:
                         finalLabelIds.length > 0 ? finalLabelIds : undefined,
@@ -693,6 +703,42 @@ export function EditTransactionDialog({
                                 </div>
                             )}
                         </div>
+
+                        {mode === 'edit' &&
+                            (transaction?.creditor_name ||
+                                transaction?.debtor_name) && (
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    {transaction.creditor_name && (
+                                        <div className="space-y-2">
+                                            <FormLabel className="text-sm text-muted-foreground">
+                                                {__('Creditor')}
+                                            </FormLabel>
+                                            <Input
+                                                value={
+                                                    transaction.creditor_name
+                                                }
+                                                disabled
+                                                readOnly
+                                                className="bg-muted"
+                                            />
+                                        </div>
+                                    )}
+
+                                    {transaction.debtor_name && (
+                                        <div className="space-y-2">
+                                            <FormLabel className="text-sm text-muted-foreground">
+                                                {__('Debtor')}
+                                            </FormLabel>
+                                            <Input
+                                                value={transaction.debtor_name}
+                                                disabled
+                                                readOnly
+                                                className="bg-muted"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                         <div className="space-y-2">
                             <FormLabel

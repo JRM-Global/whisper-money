@@ -21,7 +21,17 @@ class UpdateCategoryRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        if ($this->input('type') !== CategoryType::Transfer->value) {
+        $type = CategoryType::tryFrom((string) $this->input('type'));
+
+        if (in_array($type, [CategoryType::Savings, CategoryType::Investment], true)) {
+            $this->merge([
+                'cashflow_direction' => CategoryCashflowDirection::Outflow->value,
+            ]);
+
+            return;
+        }
+
+        if ($type !== CategoryType::Transfer) {
             $this->merge([
                 'cashflow_direction' => CategoryCashflowDirection::Hidden->value,
             ]);
@@ -48,6 +58,7 @@ class UpdateCategoryRequest extends FormRequest
                 'max:255',
                 Rule::unique('categories', 'name')
                     ->where('user_id', auth()->id())
+                    ->withoutTrashed()
                     ->ignore($this->route('category')),
             ],
             'icon' => ['required', 'string'],
