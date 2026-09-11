@@ -1,3 +1,5 @@
+> 📋 **Cuentas y servicios de este proyecto:** ver `.claude/infra.md` (gitignoreado — identificadores, no secretos).
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
