@@ -32,3 +32,12 @@ yarn-error.log
 .claude/settings.local.json
 .php-version
 .pint.cache
+
+# codebase-memory-mcp index (local, no versionar)
+.codebase-memory/
+
+# Manifiesto de infra (identificadores, no commitear)
+.claude/infra.md
+
+# Volcado del repo para pasarle contexto a un modelo (generado)
+repomix-output.md

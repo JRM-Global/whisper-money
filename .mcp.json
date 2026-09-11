@@ -10,6 +10,13 @@
         "sentry": {
             "type": "http",
             "url": "https://mcp.sentry.dev/mcp"
+        },
+        "codebase-memory-mcp": {
+            "command": "/Users/jhonatan/.local/bin/codebase-memory-mcp",
+            "args": [],
+            "env": {
+                "CBM_CACHE_DIR": "/Users/jhonatan/proyectos/saas/whisper-money/.codebase-memory"
+            }
         }
     }
 }
