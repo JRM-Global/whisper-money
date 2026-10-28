@@ -28,9 +28,10 @@ jobs:
           git fetch upstream
           # Checkout origin/main explícitamente: con dos remotes (origin + upstream)
           # ambos con rama "main", "git checkout main" es ambiguo.
-          git checkout -B main origin/main
+          git checkout -B upstream-sync origin/main
           if git merge upstream/main --no-edit -m "chore: sync upstream $(date +%Y-%m-%d)"; then
-            git push origin main
+            git push origin upstream-sync --force
+            echo "::notice::Successfully synced upstream to branch 'upstream-sync'. Review and merge to main."
           else
             echo "::warning::Merge conflict or nothing to merge; aborting. Manual sync may be required."
             git merge --abort || true

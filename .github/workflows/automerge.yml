@@ -19,9 +19,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          CI_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          HEAD_BRANCH="${{ github.event.workflow_run.head_branch }}"
-
           PR_NUMBER=$(gh pr list --repo "$REPO" --head "$HEAD_BRANCH" --state open --json number --jq '.[0].number')
 
           if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
@@ -37,7 +37,6 @@ jobs:
           fi
 
           # Ensure the CI run matches the PR's latest commit to avoid merging stale results
-          CI_SHA="${{ github.event.workflow_run.head_sha }}"
           PR_SHA=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefOid --jq '.headRefOid')
 
           if [ "$CI_SHA" != "$PR_SHA" ]; then

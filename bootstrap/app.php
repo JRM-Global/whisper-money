@@ -29,8 +29,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state', 'chart-color-scheme']);
 
+        $trustedProxies = env('TRUSTED_PROXIES', '127.0.0.1');
         $middleware->trustProxies(
-            at: '*',
+            at: $trustedProxies === '*' ? '*' : array_filter(array_map('trim', explode(',', (string) $trustedProxies))),
             headers: Request::HEADER_X_FORWARDED_FOR
                 | Request::HEADER_X_FORWARDED_HOST
                 | Request::HEADER_X_FORWARDED_PORT
